@@ -3,10 +3,13 @@
  */
 package com.elinext.task;
 
+import com.elinext.task.data.SampleDao;
 import com.elinext.task.data.SampleService;
+import com.elinext.task.data.impl.SampleDaoImpl;
 import com.elinext.task.data.impl.SampleServiceImpl;
 import com.elinext.task.injector.Injector;
 import com.elinext.task.injector.impl.InjectorImpl;
+import com.elinext.task.provider.Provider;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -20,8 +23,14 @@ public class LibraryTest {
     public void sample(){
         Injector injector = new InjectorImpl();
 
+        injector.bind(SampleDao.class, SampleDaoImpl.class);
         injector.bind(SampleService.class, SampleServiceImpl.class);
 
+        Provider<SampleService> testInstance = injector.getProvider(SampleService.class);
 
+        SampleServiceImpl sampleServiceImpl = (SampleServiceImpl) testInstance.getInstance();
+        assertNotNull(sampleServiceImpl.getSampleDao());
+        assertNotNull(testInstance.getInstance());
+        assertSame(SampleServiceImpl.class, testInstance.getInstance().getClass());
     }
 }
