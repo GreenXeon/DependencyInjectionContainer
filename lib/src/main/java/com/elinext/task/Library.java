@@ -12,18 +12,6 @@ import com.elinext.task.injector.impl.InjectorImpl;
 import com.elinext.task.provider.Provider;
 
 public class Library {
-    public boolean someLibraryMethod() {
-        return true;
-    }
-
     public static void main(String[] args) {
-        Injector injector = new InjectorImpl();
-
-        injector.bind(SampleDao.class, SampleDaoImpl.class);
-        injector.bind(SampleService.class, SampleServiceImpl.class);
-
-        Provider<SampleService> provider = injector.getProvider(SampleService.class);
-
-        System.out.println(provider.getInstance());
     }
 }

@@ -16,71 +16,75 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 public class InjectorImpl implements Injector {
-    private Map<Class<?>, Class<?>> diMap = new HashMap<>();
+    private final Map<Class<?>, Class<?>> diMap = new HashMap<>();
+    private final Map<Class<?>, Object> singletonInstances = new HashMap<>();
 
     @Override
-    public <T> Provider<T> getProvider(Class<T> type) {
-        Object classInstance = null;
-        try{
-            Constructor<?> chosenConstructor = null;
-            Class<?> impl = diMap.get(type);
-            int injectedConstructors = 0;
-            for (Constructor<?> constructor : impl.getConstructors()){
-                if (constructor.isAnnotationPresent(Inject.class)){
-                    injectedConstructors++;
+    public <T> Provider<T> getProvider(Class<T> type) throws BindingNotFoundException{
+        synchronized (this) {
+            Object classInstance = null;
+            try {
+                Constructor<?> chosenConstructor;
+                Class<?> impl = diMap.get(type);
+                if (impl == null){
+                    return null;
                 }
-            }
-            if (injectedConstructors > 1){
-                throw new TooManyConstructorsException("There are 2 or more constructors with annotation "
-                        + Inject.class);
-            } else if (injectedConstructors == 0){
-                boolean defaultConstructor = Stream.of(impl.getConstructors())
-                        .anyMatch((constructor) -> constructor.getParameterCount() == 0);
-                if (!defaultConstructor){
-                    throw new ConstructorNotFoundException("Cannot find default constructor");
-                } else {
-                    System.out.println("Default constructor is found");
-                    chosenConstructor = impl.getConstructor();
-                    classInstance = chosenConstructor.newInstance();
-                }
-            } else if (injectedConstructors == 1){
-                System.out.println("One constructor with Inject annotation");
-                chosenConstructor = Stream.of(impl.getConstructors())
+                int injectedConstructors = (int) Stream.of(impl.getConstructors())
                         .filter((constructor) -> constructor.isAnnotationPresent(Inject.class))
-                        .findFirst()
-                        .get();
-                Class<?>[] parametersTypes = chosenConstructor.getParameterTypes();
-                List<Object> listOfInjectings = new LinkedList<>();
-                for (Class<?> classType : parametersTypes){
-                    if (!diMap.containsKey(classType)){
-                        throw new BindingNotFoundException("Binding for " + classType + " was not found");
-                    }
-                    System.out.println(this.getProvider(classType).getInstance());
-                    listOfInjectings.add(
-                            this.getProvider(classType).getInstance()
-                    );
+                        .count();
+                switch (injectedConstructors){
+                    case 0:
+                        chosenConstructor = impl.getConstructor();
+                        classInstance = chosenConstructor.newInstance();
+                        break;
+                    case 1:
+                        chosenConstructor = Stream.of(impl.getConstructors())
+                                .filter((constructor) -> constructor.isAnnotationPresent(Inject.class))
+                                .findFirst()
+                                .get();
+                        Class<?>[] parametersTypes = chosenConstructor.getParameterTypes();
+                        List<Object> listOfInjectings = new LinkedList<>();
+                        for (Class<?> classType : parametersTypes) {
+                            if (!diMap.containsKey(classType)) {
+                                throw new BindingNotFoundException("Binding for " + classType + " was not found");
+                            }
+                            listOfInjectings.add(
+                                    this.getProvider(classType).getInstance()
+                            );
+                        }
+                        classInstance = chosenConstructor.newInstance(listOfInjectings.toArray());
+                        break;
+                    default:
                 }
-                classInstance = chosenConstructor.newInstance(listOfInjectings.toArray());
+            } catch (NoSuchMethodException | IllegalAccessException | InstantiationException
+                    | InvocationTargetException e) {
+                System.out.println(e.getMessage());
             }
-
-        } catch (TooManyConstructorsException | ConstructorNotFoundException | NoSuchMethodException
-                | BindingNotFoundException | IllegalAccessException | InstantiationException
-                | InvocationTargetException e) {
-            System.out.println(e.getMessage());
+            final Object finalClassInstance = classInstance;
+            return () -> type.cast(finalClassInstance);
         }
-        Object finalClassInstance = classInstance;
-        return () -> (T) finalClassInstance;
     }
 
     @Override
-    public <T> void bind(Class<T> intf, Class<? extends T> impl) {
+    public <T> void bind(Class<T> intf, Class<? extends T> impl) throws TooManyConstructorsException,
+            ConstructorNotFoundException {
+        int injectedConstructors = (int) Stream.of(impl.getConstructors())
+                .filter((constructor) -> constructor.isAnnotationPresent(Inject.class))
+                .count();
+        if (injectedConstructors > 1) {
+            throw new TooManyConstructorsException("There are 2 or more constructors with annotation "
+                    + Inject.class);
+        } else if (injectedConstructors == 0) {
+            boolean defaultConstructor = Stream.of(impl.getConstructors())
+                    .anyMatch((constructor) -> constructor.getParameterCount() == 0);
+            if (!defaultConstructor) {
+                throw new ConstructorNotFoundException("Cannot find default constructor at " + impl.getName());
+            }
+        }
         diMap.put(intf, impl);
     }
 
     @Override
     public <T> void bindSingleton(Class<T> intf, Class<? extends T> impl) {
-        if (diMap.containsValue(impl)){
-
-        }
     }
 }
