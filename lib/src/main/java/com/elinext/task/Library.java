@@ -3,14 +3,6 @@
  */
 package com.elinext.task;
 
-import com.elinext.task.data.SampleDao;
-import com.elinext.task.data.SampleService;
-import com.elinext.task.data.impl.SampleDaoImpl;
-import com.elinext.task.data.impl.SampleServiceImpl;
-import com.elinext.task.injector.Injector;
-import com.elinext.task.injector.impl.InjectorImpl;
-import com.elinext.task.provider.Provider;
-
 public class Library {
     public static void main(String[] args) {
     }

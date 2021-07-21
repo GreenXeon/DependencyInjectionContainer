@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 public class InjectorImpl implements Injector {
-    private final Map<Class<?>, Class<?>> diMap = new HashMap<>();
+    private final Map<Class<?>, Class<?>> bindingMap = new HashMap<>();
     private final Map<Class<?>, Object> singletonInstances = new HashMap<>();
 
     @Override
@@ -25,10 +25,11 @@ public class InjectorImpl implements Injector {
             Object classInstance = null;
             try {
                 Constructor<?> chosenConstructor;
-                Class<?> impl = diMap.get(type);
+                Class<?> impl = bindingMap.get(type);
                 if (impl == null){
                     return null;
                 }
+
                 int injectedConstructors = (int) Stream.of(impl.getConstructors())
                         .filter((constructor) -> constructor.isAnnotationPresent(Inject.class))
                         .count();
@@ -45,11 +46,12 @@ public class InjectorImpl implements Injector {
                         Class<?>[] parametersTypes = chosenConstructor.getParameterTypes();
                         List<Object> listOfInjectings = new LinkedList<>();
                         for (Class<?> classType : parametersTypes) {
-                            if (!diMap.containsKey(classType)) {
+                            if (!bindingMap.containsKey(classType)) {
                                 throw new BindingNotFoundException("Binding for " + classType + " was not found");
                             }
                             listOfInjectings.add(
-                                    this.getProvider(classType).getInstance()
+                                    singletonInstances.containsKey(classType) ? singletonInstances.get(classType)
+                                    : this.getProvider(classType).getInstance()
                             );
                         }
                         classInstance = chosenConstructor.newInstance(listOfInjectings.toArray());
@@ -81,10 +83,14 @@ public class InjectorImpl implements Injector {
                 throw new ConstructorNotFoundException("Cannot find default constructor at " + impl.getName());
             }
         }
-        diMap.put(intf, impl);
+        bindingMap.put(intf, impl);
     }
 
     @Override
-    public <T> void bindSingleton(Class<T> intf, Class<? extends T> impl) {
+    public <T> void bindSingleton(Class<T> intf, Class<? extends T> impl)
+            throws ConstructorNotFoundException, TooManyConstructorsException, BindingNotFoundException {
+        bind(intf, impl);
+        Object singletonInstance = getProvider(intf).getInstance();
+        singletonInstances.put(intf, singletonInstance);
     }
 }

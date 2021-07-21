@@ -4,10 +4,7 @@
 package com.elinext.task;
 
 import com.elinext.task.annotation.Inject;
-import com.elinext.task.data.RandomInterface;
-import com.elinext.task.data.SampleController;
-import com.elinext.task.data.SampleDao;
-import com.elinext.task.data.SampleService;
+import com.elinext.task.data.*;
 import com.elinext.task.data.impl.SampleControllerImpl;
 import com.elinext.task.data.impl.SampleDaoImpl;
 import com.elinext.task.data.impl.SampleServiceImpl;
@@ -101,5 +98,23 @@ public class LibraryTest {
             }
         }
         assertThrows(ConstructorNotFoundException.class, () -> injector.bind(RandomInterface.class, SampleClass.class));
+    }
+
+    @Test
+    public void whenBindSingletonThenCreateTheOnlyInstance()
+            throws ConstructorNotFoundException, TooManyConstructorsException, BindingNotFoundException {
+        injector.bindSingleton(SampleDao.class, SampleDaoImpl.class);
+        injector.bind(SampleService.class, SampleServiceImpl.class);
+
+        SampleServiceImpl firstProviderInstance = (SampleServiceImpl) injector.getProvider(SampleService.class)
+                .getInstance();
+        SampleServiceImpl secondProviderInstance = (SampleServiceImpl) injector.getProvider(SampleService.class)
+                .getInstance();
+
+        SampleDaoImpl firstDao = (SampleDaoImpl) firstProviderInstance.getSampleDao();
+        SampleDaoImpl secondDao = (SampleDaoImpl) secondProviderInstance.getSampleDao();
+
+        assertNotSame(firstProviderInstance, secondProviderInstance);
+        assertSame(firstDao, secondDao);
     }
 }

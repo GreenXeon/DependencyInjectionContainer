@@ -10,6 +10,6 @@ public interface Injector {
 
     <T> void bind(Class<T> intf, Class<? extends T> impl) throws TooManyConstructorsException, ConstructorNotFoundException; //регистрация байндинга по классу интерфейса и его реализации
 
-    <T> void bindSingleton(Class<T> intf, Class<? extends T> impl); //регистрация синглтон класса
+    <T> void bindSingleton(Class<T> intf, Class<? extends T> impl) throws ConstructorNotFoundException, TooManyConstructorsException, BindingNotFoundException; //регистрация синглтон класса
 }
 
