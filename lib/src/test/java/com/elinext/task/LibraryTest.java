@@ -3,34 +3,103 @@
  */
 package com.elinext.task;
 
+import com.elinext.task.annotation.Inject;
+import com.elinext.task.data.RandomInterface;
+import com.elinext.task.data.SampleController;
 import com.elinext.task.data.SampleDao;
 import com.elinext.task.data.SampleService;
+import com.elinext.task.data.impl.SampleControllerImpl;
 import com.elinext.task.data.impl.SampleDaoImpl;
 import com.elinext.task.data.impl.SampleServiceImpl;
-import com.elinext.task.injector.Injector;
+import com.elinext.task.exception.BindingNotFoundException;
+import com.elinext.task.exception.ConstructorNotFoundException;
+import com.elinext.task.exception.TooManyConstructorsException;
 import com.elinext.task.injector.impl.InjectorImpl;
 import com.elinext.task.provider.Provider;
+import org.junit.Before;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 public class LibraryTest {
-    @Test public void testSomeLibraryMethod() {
-        Library classUnderTest = new Library();
-        assertTrue("someLibraryMethod should return 'true'", classUnderTest.someLibraryMethod());
+    private InjectorImpl injector;
+
+    @Before
+    public void beforeClassMethod(){
+        injector = new InjectorImpl();
     }
 
     @Test
-    public void sample(){
-        Injector injector = new InjectorImpl();
-
+    public void whenDaoIsInjectedIntoService() throws ConstructorNotFoundException, TooManyConstructorsException,
+            BindingNotFoundException {
         injector.bind(SampleDao.class, SampleDaoImpl.class);
         injector.bind(SampleService.class, SampleServiceImpl.class);
 
         Provider<SampleService> testInstance = injector.getProvider(SampleService.class);
+        SampleServiceImpl sampleService = (SampleServiceImpl) testInstance.getInstance();
 
-        SampleServiceImpl sampleServiceImpl = (SampleServiceImpl) testInstance.getInstance();
-        assertNotNull(sampleServiceImpl.getSampleDao());
-        assertNotNull(testInstance.getInstance());
-        assertSame(SampleServiceImpl.class, testInstance.getInstance().getClass());
+        assertNotNull(sampleService);
+        assertNotNull(sampleService.getSampleDao());
+
+        assertSame(SampleServiceImpl.class, sampleService.getClass());
+        assertSame(SampleDaoImpl.class, sampleService.getSampleDao().getClass());
+    }
+
+    @Test
+    public void whenServiceIsInjectedIntoController() throws ConstructorNotFoundException, TooManyConstructorsException,
+            BindingNotFoundException {
+        injector.bind(SampleDao.class, SampleDaoImpl.class);
+        injector.bind(SampleService.class, SampleServiceImpl.class);
+        injector.bind(SampleController.class, SampleControllerImpl.class);
+
+        Provider<SampleController> controllerProvider = injector.getProvider(SampleController.class);
+        SampleControllerImpl sampleController = (SampleControllerImpl) controllerProvider.getInstance();
+
+        assertNotNull(sampleController);
+        assertNotNull(((SampleServiceImpl) sampleController.getSampleService()).getSampleDao());
+    }
+
+    @Test
+    public void whenAnyBindingIsNotFoundThrowException()
+            throws ConstructorNotFoundException, TooManyConstructorsException {
+        injector.bind(SampleService.class, SampleServiceImpl.class);
+        injector.bind(SampleController.class, SampleControllerImpl.class);
+        assertThrows(BindingNotFoundException.class, () -> injector.getProvider(SampleController.class));
+    }
+
+    @Test
+    public void whenInterfaceHasNoBindingReturnNullProvider() throws BindingNotFoundException {
+        assertNull(injector.getProvider(RandomInterface.class));
+    }
+
+    @Test
+    public void whenBindingClassHasMoreThanOneInjectConstructor(){
+        class SampleClass implements RandomInterface{
+            private SampleDao sampleDao;
+            private SampleService sampleService;
+
+            @Inject
+            public SampleClass(SampleDao sampleDao) {
+                this.sampleDao = sampleDao;
+            }
+
+            @Inject
+            public SampleClass(SampleService sampleService) {
+                this.sampleService = sampleService;
+            }
+        }
+        assertThrows(TooManyConstructorsException.class,() -> injector.bind(RandomInterface.class, SampleClass.class));
+    }
+
+    @Test
+    public void whenDefaultConstructorIsNotFoundThrowException(){
+        class SampleClass implements RandomInterface{
+            private String sampleField;
+
+            public SampleClass(String s) {
+                sampleField = s;
+            }
+        }
+        assertThrows(ConstructorNotFoundException.class, () -> injector.bind(RandomInterface.class, SampleClass.class));
     }
 }
